@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Código Prisma</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#101426;color:#fff}
+main{max-width:900px;margin:auto;padding:20px}.card{background:#1b2140;padding:20px;border-radius:18px;margin:16px 0}
+.hidden{display:none}.center{text-align:center}button{padding:10px 14px;border:0;border-radius:10px;font-weight:700;cursor:pointer;margin:4px}
+.primary{background:#7c9cff}.secondary{background:#e9eef8}.danger{background:#ff6b6b}.green{background:#69db7c}
+.levels,.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.box{background:#11172d;padding:16px;border-radius:14px;border:1px solid #39446b}
+.palette,.slots,.row,.guess{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+.ball,.slot,.mini{width:44px;height:44px;border-radius:50%;border:3px solid #fff6;box-sizing:border-box}
+.ball{cursor:pointer}.slot{background:#0b1020;border-style:dashed}.slot.filled{border-style:solid}
+.badge{display:inline-block;background:#27345e;padding:6px 10px;border-radius:999px}
+.attempt{background:#11172d;border:1px solid #39446b;padding:10px;border-radius:12px;margin:8px 0}
+.feedback{margin-top:8px;font-size:.95rem}.tag{display:inline-block;padding:4px 8px;border-radius:999px;margin:3px;font-weight:700}
+.ok{background:#d3f9d8;color:#174b21}.move{background:#fff3bf;color:#665100}.no{background:#ffe3e3;color:#7a1f1f}
+.link{word-break:break-all;background:#0b1020;padding:12px;border-radius:10px;font-family:monospace}
+.small{color:#b8c2dc;font-size:.9rem}
+.legend{margin-top:10px;color:#cfd7ee;font-size:.9rem}
+.countBox{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.countPill{padding:5px 9px;border-radius:999px;background:#263354;color:#fff}
+.easyGuessGrid{display:grid;grid-template-columns:repeat(4,78px);gap:10px;justify-content:center;align-items:start;margin-top:8px}
+.easyGuessCell{display:flex;flex-direction:column;align-items:center;min-height:88px}
+.easyGuessCell .mini{flex:0 0 auto}
+.easyLabels{margin-top:6px;font-size:.78rem;line-height:1.25;min-height:36px;text-align:center}
+.easyLabels div{white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+<h1 class="center">🔐 Código Prisma</h1>
+<p class="center small">Descubre la combinación secreta de colores</p>
+
+<section id="home" class="card center">
+<h2>¿Cómo quieres jugar?</h2>
+<div class="modes">
+<div class="box"><h3>💻 Contra la PC</h3><p class="small">La PC crea el código secreto.</p><button class="primary" onclick="pickMode('pc')">Jugar contra la PC</button></div>
+<div class="box"><h3>💞 Con pareja</h3><p class="small">Tú creas el código y compartes una liga.</p><button class="primary" onclick="pickMode('pair')">Crear partida</button></div>
+</div>
+</section>
+
+<section id="levels" class="card hidden center">
+<h2>Elige dificultad</h2>
+<div class="levels">
+<div class="box"><h3>🌱 Muy fácil</h3><p class="small">Sin repetición. Indica qué pasa con cada posición.</p><button onclick="pickLevel('veryeasy')">Elegir</button></div>
+<div class="box"><h3>🎯 Fácil</h3><p class="small">Sin repetición. Debajo de cada esfera confirma Color OK y, cuando corresponda, Posición OK.</p><button onclick="pickLevel('easy')">Elegir</button></div>
+<div class="box"><h3>🧠 Difícil</h3><p class="small">Permite repetir colores. Solo indica cantidades.</p><button onclick="pickLevel('hard')">Elegir</button></div>
+</div>
+</section>
+
+<section id="creator" class="card hidden center">
+<h2>Crea la combinación</h2>
+<div id="creatorBadge" class="badge"></div>
+<p id="creatorRule" class="small"></p>
+<div id="creatorSlots" class="slots"></div>
+<div id="creatorPalette" class="palette"></div>
+<div class="row"><button class="secondary" onclick="creator.pop();renderCreator()">Borrar última</button><button class="danger" onclick="creator=[];renderCreator()">Limpiar</button></div>
+<button id="makeLink" class="green" onclick="makeShare()" disabled>Crear liga para compartir</button>
+<p id="creatorMsg" class="small"></p>
+</section>
+
+<section id="share" class="card hidden center">
+<h2>Partida creada</h2>
+<div id="shareBadge" class="badge"></div>
+<p class="small">Tu pareja verá el nivel, pero no la combinación.</p>
+<div id="shareUrl" class="link"></div>
+<button class="primary" onclick="copyLink()">Copiar liga</button>
+<p id="copyMsg" class="small"></p>
+</section>
+
+<section id="game" class="card hidden center">
+<h2 id="gameTitle"></h2>
+<div id="gameBadge" class="badge"></div>
+<p id="gameRule" class="small"></p>
+<p>Intentos restantes: <b id="left">10</b></p>
+<div id="guessSlots" class="slots"></div>
+<div id="gamePalette" class="palette"></div>
+<div class="row"><button class="secondary" onclick="guess.pop();renderGuess()">Borrar última</button><button class="danger" onclick="guess=[];renderGuess()">Limpiar</button><button id="checkBtn" class="green" onclick="submitGuess()" disabled>Comprobar</button></div>
+<p id="status"></p>
+<div id="history"></div>
+<div id="reveal" class="hidden"></div>
+</section>
+</main>
+
+<script>
+const COLORS=[
+{id:'R',name:'Rojo',c:'#e03131'},{id:'A',name:'Azul',c:'#1971c2'},{id:'V',name:'Verde',c:'#2f9e44'},
+{id:'Y',name:'Amarillo',c:'#f2c94c'},{id:'M',name:'Morado',c:'#9c36b5'},{id:'N',name:'Naranja',c:'#f76707'}];
+
+let mode='',level='',secret=[],creator=[],guess=[],tries=0,shared='';
+
+function show(id){['home','levels','creator','share','game'].forEach(x=>document.getElementById(x).classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
+function lname(){return level==='veryeasy'?'Muy fácil · sin repetición':level==='easy'?'Fácil · sin repetición':'Difícil · con repetición permitida'}
+function lrule(){return level==='veryeasy'
+  ?'Después de cada intento verás qué ocurre con cada posición.'
+  :level==='easy'
+  ?'Sin repetición. La respuesta solo indica cuántos colores están bien colocados y cuántos están en otra posición.'
+  :'Puede haber colores repetidos. La respuesta solo indica cuántos colores están bien colocados y cuántos están en otra posición.'}
+function repeat(){return level==='hard'}
+function pickMode(m){mode=m;show('levels')}
+function pickLevel(l){level=l;if(mode==='pc'){secret=makePc();startGame('pc')}else{creator=[];renderCreator();show('creator')}}
+function makePc(){if(repeat())return Array.from({length:4},()=>COLORS[Math.floor(Math.random()*6)].id);return [...COLORS].sort(()=>Math.random()-.5).slice(0,4).map(x=>x.id)}
+function co(id){return COLORS.find(x=>x.id===id)}
+
+function drawSlots(id,arr){
+  let b=document.getElementById(id);b.innerHTML='';
+  for(let i=0;i<4;i++){
+    let s=document.createElement('div');
+    s.className='slot'+(arr[i]?' filled':'');
+    if(arr[i]){s.style.background=co(arr[i]).c;s.title=co(arr[i]).name}
+    b.appendChild(s)
+  }
+}
+
+function drawPalette(id,fn){
+  let b=document.getElementById(id);b.innerHTML='';
+  COLORS.forEach(x=>{
+    let q=document.createElement('button');
+    q.className='ball';q.style.background=x.c;q.title=x.name;q.setAttribute('aria-label',x.name);
+    q.onclick=()=>fn(x.id);b.appendChild(q)
+  })
+}
+
+function renderCreator(){
+  document.getElementById('creatorBadge').textContent=lname();
+  document.getElementById('creatorRule').textContent=lrule();
+  drawSlots('creatorSlots',creator);
+  drawPalette('creatorPalette',addCreator);
+  document.getElementById('makeLink').disabled=creator.length!==4
+}
+
+function addCreator(id){
+  if(creator.length>=4)return;
+  if(!repeat()&&creator.includes(id)){
+    document.getElementById('creatorMsg').textContent='En este nivel no se permite repetir colores.';
+    return
+  }
+  document.getElementById('creatorMsg').textContent='';
+  creator.push(id);renderCreator()
+}
+
+function enc(o){return btoa(JSON.stringify(o)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function dec(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return JSON.parse(atob(s))}
+function base(){return location.href.split('#')[0]}
+
+function makeShare(){
+  shared=base()+'#j='+enc({l:level,s:creator.join('')});
+  document.getElementById('shareBadge').textContent=lname();
+  document.getElementById('shareUrl').textContent=shared;
+  show('share')
+}
+
+async function copyLink(){
+  try{
+    await navigator.clipboard.writeText(shared);
+    document.getElementById('copyMsg').textContent='Liga copiada.'
+  }catch(e){
+    document.getElementById('copyMsg').textContent='Copia manualmente la liga de arriba.'
+  }
+}
+
+function startGame(who){
+  guess=[];tries=0;
+  document.getElementById('gameTitle').textContent=who==='pc'?'Contra la PC':'Partida creada por tu pareja';
+  document.getElementById('gameBadge').textContent=lname();
+  document.getElementById('gameRule').textContent=lrule();
+  document.getElementById('left').textContent=10;
+  document.getElementById('history').innerHTML='';
+  document.getElementById('status').textContent='';
+  document.getElementById('reveal').classList.add('hidden');
+  renderGuess();show('game')
+}
+
+function renderGuess(){
+  drawSlots('guessSlots',guess);
+  drawPalette('gamePalette',addGuess);
+  document.getElementById('checkBtn').disabled=guess.length!==4
+}
+
+function addGuess(id){
+  if(guess.length>=4)return;
+  if(!repeat()&&guess.includes(id)){
+    document.getElementById('status').textContent='En este nivel no se permite repetir colores.';
+    return
+  }
+  document.getElementById('status').textContent='';
+  guess.push(id);renderGuess()
+}
+
+/* Evaluación única compartida por PC y Pareja */
+function score(g){
+  let usedSecret=Array(4).fill(false);
+  let detail=Array(4).fill('no');
+  let exact=0,move=0;
+
+  for(let i=0;i<4;i++){
+    if(g[i]===secret[i]){
+      usedSecret[i]=true;
+      detail[i]='ok';
+      exact++;
+    }
+  }
+
+  for(let i=0;i<4;i++){
+    if(detail[i]==='ok')continue;
+    for(let j=0;j<4;j++){
+      if(!usedSecret[j]&&g[i]===secret[j]){
+        usedSecret[j]=true;
+        detail[i]='move';
+        move++;
+        break;
+      }
+    }
+  }
+  return{exact,move,detail}
+}
+
+function feedbackHtml(s){
+  if(level==='veryeasy'){
+    return '<div class="feedback">'+s.detail.map((d,i)=>
+      '<span class="tag '+d+'">'+
+      (i+1)+': '+
+      (d==='ok'?'color y posición correctos':d==='move'?'color correcto, otra posición':'ese color no está')+
+      '</span>'
+    ).join('')+'</div>';
+  }
+
+  if(level==='easy'){
+    return '';
+  }
+
+  return '<div class="feedback">'+
+    '<div class="countBox">'+
+    '<span class="countPill">'+s.exact+' color(es) en posición correcta</span>'+
+    '<span class="countPill">'+s.move+' color(es) correctos en otra posición</span>'+
+    '</div>'+
+    '</div>';
+}
+
+function easyGuessHtml(g,s){
+  return '<div class="easyGuessGrid">'+g.map((id,i)=>{
+    const d=s.detail[i];
+    const line1 = d==='ok' || d==='move' ? '<div>Color OK</div>' : '<div>&nbsp;</div>';
+    const line2 = d==='ok' ? '<div>Posición OK</div>' : '<div>&nbsp;</div>';
+    return '<div class="easyGuessCell">'+
+      '<span class="mini" title="'+co(id).name+'" style="background:'+co(id).c+'"></span>'+
+      '<div class="easyLabels">'+line1+line2+'</div>'+
+      '</div>';
+  }).join('')+'</div>';
+}
+
+function submitGuess(){
+  let g=[...guess],s=score(g);
+  tries++;
+
+  let a=document.createElement('div');
+  a.className='attempt';
+
+  let balls='<div class="guess">'+g.map(x=>
+    '<span class="mini" title="'+co(x).name+'" style="background:'+co(x).c+'"></span>'
+  ).join('')+'</div>';
+
+  if(level==='easy'){
+    a.innerHTML='<b>Intento '+tries+'</b>'+easyGuessHtml(g,s);
+  }else{
+    a.innerHTML='<b>Intento '+tries+'</b>'+balls+feedbackHtml(s);
+  }
+  document.getElementById('history').prepend(a);
+
+  document.getElementById('left').textContent=10-tries;
+  guess=[];renderGuess();
+
+  if(s.exact===4)end(true);
+  else if(tries>=10)end(false)
+}
+
+function end(win){
+  document.getElementById('status').textContent=win?'¡Código descubierto!':'Se terminaron los intentos.';
+  document.getElementById('checkBtn').disabled=true;
+
+  let r=document.getElementById('reveal');
+  r.innerHTML=
+    '<h3>'+(win?'Combinación resuelta':'La combinación era')+'</h3>'+
+    '<div class="guess">'+secret.map(x=>
+      '<span class="mini" title="'+co(x).name+'" style="background:'+co(x).c+'"></span>'
+    ).join('')+'</div>'+
+    '<button class="primary" onclick="location.href=base()">Jugar otra vez</button>';
+
+  r.classList.remove('hidden')
+}
+
+function incoming(){
+  if(location.hash.startsWith('#j=')){
+    try{
+      let d=dec(location.hash.slice(3));
+      if(['veryeasy','easy','hard'].includes(d.l)&&/^[RAVYMN]{4}$/.test(d.s)){
+        level=d.l;
+        secret=d.s.split('');
+        startGame('pair');
+        return true
+      }
+    }catch(e){}
+  }
+  return false
+}
+
+incoming();
+</script>
+</body>
+</html>
